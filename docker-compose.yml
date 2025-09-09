@@ -54,31 +54,6 @@ services:
       timeout: 10s
       retries: 3
 
-  # MCP Server - AI Agent Tools
-  mcp-server:
-    build:
-      context: ./mcp-server
-      dockerfile: Dockerfile
-      target: development
-    ports:
-      - "5222:5222"
-    volumes:
-      - ./mcp-server:/app
-    environment:
-      - ENVIRONMENT=development
-      - BACKEND_URL=http://backend:8000
-      - SERVER_SECRET=${SERVER_SECRET}
-    depends_on:
-      - backend
-    networks:
-      - reactorsync-network
-    restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:5222/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-
   # Database - PostgreSQL with pgvector
   db:
     image: pgvector/pgvector:pg16
@@ -124,22 +99,42 @@ services:
       timeout: 10s
       retries: 3
 
-  # Data Generator - Synthetic telemetry generation
-  data-generator:
-    build:
-      context: ./data-generator
-      dockerfile: Dockerfile
-    environment:
-      - KAFKA_BOOTSTRAP_SERVERS=streaming:9092
-      - DATABASE_URL=postgresql://reactorsync:reactorsync@db:5432/reactorsync
-    depends_on:
-      - streaming
-      - db
-    volumes:
-      - ./data-generator:/app
-    networks:
-      - reactorsync-network
-    restart: unless-stopped
+  # MCP Server - AI Agent Tools (Sprint 3)
+  # mcp-server:
+  #   build:
+  #     context: ./mcp-server
+  #     dockerfile: Dockerfile
+  #     target: development
+  #   ports:
+  #     - "5222:5222"
+  #   volumes:
+  #     - ./mcp-server:/app
+  #   environment:
+  #     - ENVIRONMENT=development
+  #     - BACKEND_URL=http://backend:8000
+  #     - SERVER_SECRET=${SERVER_SECRET}
+  #   depends_on:
+  #     - backend
+  #   networks:
+  #     - reactorsync-network
+  #   restart: unless-stopped
+
+  # Data Generator - Synthetic telemetry generation (Sprint 2)
+  # data-generator:
+  #   build:
+  #     context: ./data-generator
+  #     dockerfile: Dockerfile
+  #   environment:
+  #     - KAFKA_BOOTSTRAP_SERVERS=streaming:9092
+  #     - DATABASE_URL=postgresql://reactorsync:reactorsync@db:5432/reactorsync
+  #   depends_on:
+  #     - streaming
+  #     - db
+  #   volumes:
+  #     - ./data-generator:/app
+  #   networks:
+  #     - reactorsync-network
+  #   restart: unless-stopped
 
   # Redis - Caching and session storage
   redis:

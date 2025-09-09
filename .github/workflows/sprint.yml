@@ -1,0 +1,81 @@
+name: Sprint Validation
+
+on:
+  push:
+    branches: [ sprint-* ]
+  pull_request:
+    branches: [ sprint-* ]
+
+jobs:
+  # Quick validation for sprint branches
+  validate:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Validate Docker Compose
+      run: |
+        # Create minimal .env for validation
+        echo "COHERE_API_KEY=test_key" > .env
+        echo "SERVER_SECRET=test_secret" >> .env
+        
+        # Validate docker-compose configuration
+        docker-compose config
+
+    - name: Check frontend structure
+      run: |
+        if [ ! -f "frontend/package.json" ]; then
+          echo "❌ Frontend package.json missing"
+          exit 1
+        fi
+        if [ ! -f "frontend/Dockerfile" ]; then
+          echo "❌ Frontend Dockerfile missing"
+          exit 1
+        fi
+        echo "✅ Frontend structure valid"
+
+    - name: Check backend structure
+      run: |
+        if [ ! -f "backend/main.py" ]; then
+          echo "❌ Backend main.py missing"
+          exit 1
+        fi
+        if [ ! -f "backend/requirements.txt" ]; then
+          echo "❌ Backend requirements.txt missing"
+          exit 1
+        fi
+        if [ ! -f "backend/Dockerfile" ]; then
+          echo "❌ Backend Dockerfile missing"
+          exit 1
+        fi
+        echo "✅ Backend structure valid"
+
+    - name: Check documentation
+      run: |
+        if [ ! -f "README.md" ]; then
+          echo "❌ README.md missing"
+          exit 1
+        fi
+        if [ ! -f "docs/setup.md" ]; then
+          echo "❌ Setup documentation missing"
+          exit 1
+        fi
+        echo "✅ Documentation present"
+
+    - name: Validate sprint tracking
+      run: |
+        # Check if sprint tasks file exists for current sprint
+        BRANCH_NAME=${GITHUB_HEAD_REF:-${GITHUB_REF#refs/heads/}}
+        if [[ $BRANCH_NAME =~ ^sprint-([0-9]+)$ ]]; then
+          SPRINT_NUM=${BASH_REMATCH[1]}
+          TASKS_FILE="sprints/sprint_${SPRINT_NUM}/sprint_${SPRINT_NUM}_tasks.md"
+          if [ ! -f "$TASKS_FILE" ]; then
+            echo "❌ Sprint tasks file missing: $TASKS_FILE"
+            exit 1
+          fi
+          echo "✅ Sprint tracking file found: $TASKS_FILE"
+        else
+          echo "ℹ️ Not a sprint branch, skipping sprint validation"
+        fi

@@ -14,7 +14,7 @@ Implement core data models and database schema for ReactorSync. This sprint focu
 ## Tasks
 
 ### Database Models & Schema
-- [ ] **Task 2.1**: Design and implement Reactor, Telemetry, Fault data models
+- [x] **Task 2.1**: Design and implement Reactor, Telemetry, Fault data models
   - Create SQLAlchemy models matching the database schema from Sprint 1
   - Implement proper relationships between models
   - Add validation and constraints
@@ -78,7 +78,39 @@ Implement core data models and database schema for ReactorSync. This sprint focu
   - Ensure proper resource cleanup
 
 ## Progress Notes
-*This section will be updated throughout the sprint with progress updates, code snippets, observations, and commit references.*
+
+### Day 1 - SQLAlchemy Models Implementation ✅
+**Completed Tasks**: 2.1
+
+**Key Accomplishments**:
+- ✅ Created comprehensive SQLAlchemy models for all core entities
+- ✅ Implemented Reactor model with status tracking, health scores, and location data
+- ✅ Built Telemetry model with time-series metrics and performance optimization indexes
+- ✅ Added Fault model with severity levels and resolution tracking
+- ✅ Developed KnowledgeBase model with pgvector support for semantic search
+- ✅ Established proper model relationships and foreign key constraints
+- ✅ Added business logic methods for health calculations and data validation
+
+**Technical Highlights**:
+- Used proper SQLAlchemy 2.0 syntax with modern declarative patterns
+- Implemented composite indexes on telemetry table for query performance
+- Added enum types for reactor status, type, and fault severity
+- Created comprehensive to_dict() and from_dict() methods for API serialization
+- Integrated pgvector for vector embeddings storage and similarity search
+- Added health score calculation logic based on telemetry ranges
+
+**Files Created**:
+- `backend/models/__init__.py` - Model exports and imports
+- `backend/models/base.py` - Database configuration and session management
+- `backend/models/reactor.py` - Nuclear reactor facility model
+- `backend/models/telemetry.py` - Time-series telemetry data model
+- `backend/models/fault.py` - Fault and incident tracking model
+- `backend/models/knowledge_base.py` - Document storage with vector embeddings
+
+**Next Steps**:
+- Set up Alembic for database migrations (Task 2.2)
+- Create database migration from existing schema (Task 2.2)
+- Implement CRUD operations and repository pattern (Task 2.4)
 
 ## Sprint Review
 *This section will be populated near the end of the sprint with demo readiness notes, gaps/issues, and next steps.*

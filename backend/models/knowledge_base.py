@@ -21,7 +21,7 @@ class KnowledgeBase(Base):
     document_name = Column(String(255), nullable=False, index=True)
     content = Column(Text, nullable=False)
     embedding = Column(Vector(1536))  # OpenAI/Cohere embedding dimension
-    metadata = Column(JSONB)  # Additional document metadata
+    doc_metadata = Column(JSONB)  # Additional document metadata
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
     def __repr__(self):
@@ -33,7 +33,7 @@ class KnowledgeBase(Base):
             "id": self.id,
             "document_name": self.document_name,
             "content": self.content,
-            "metadata": self.metadata,
+            "metadata": self.doc_metadata,
             "created_at": self.created_at.isoformat() if self.created_at else None,
             "has_embedding": self.embedding is not None
         }
@@ -45,7 +45,7 @@ class KnowledgeBase(Base):
             document_name=data["document_name"],
             content=data["content"],
             embedding=data.get("embedding"),
-            metadata=data.get("metadata", {})
+            doc_metadata=data.get("metadata", {})
         )
 
     def set_embedding(self, embedding_vector):
@@ -106,28 +106,28 @@ class KnowledgeBase(Base):
 
     def get_document_type(self):
         """Get document type from metadata"""
-        if self.metadata:
-            return self.metadata.get("document_type", "unknown")
+        if self.doc_metadata:
+            return self.doc_metadata.get("document_type", "unknown")
         return "unknown"
 
     def get_tags(self):
         """Get document tags from metadata"""
-        if self.metadata:
-            return self.metadata.get("tags", [])
+        if self.doc_metadata:
+            return self.doc_metadata.get("tags", [])
         return []
 
     def add_tag(self, tag):
         """Add a tag to document metadata"""
-        if not self.metadata:
-            self.metadata = {}
+        if not self.doc_metadata:
+            self.doc_metadata = {}
         
-        tags = self.metadata.get("tags", [])
+        tags = self.doc_metadata.get("tags", [])
         if tag not in tags:
             tags.append(tag)
-            self.metadata["tags"] = tags
+            self.doc_metadata["tags"] = tags
 
     def set_document_type(self, doc_type):
         """Set document type in metadata"""
-        if not self.metadata:
-            self.metadata = {}
-        self.metadata["document_type"] = doc_type
+        if not self.doc_metadata:
+            self.doc_metadata = {}
+        self.doc_metadata["document_type"] = doc_type

@@ -1,0 +1,42 @@
+# FastAPI and web framework
+fastapi>=0.104.0
+uvicorn[standard]>=0.24.0
+python-multipart
+
+# Database
+sqlalchemy>=2.0.0
+psycopg2-binary
+alembic
+
+# AI/ML
+cohere>=4.0.0
+haystack-ai
+
+# Data processing
+pandas>=2.0.0
+numpy>=1.24.0
+scipy>=1.10.0
+
+# Streaming
+kafka-python>=2.0.0
+
+# Caching
+redis>=5.0.0
+
+# Environment and configuration
+python-dotenv
+pydantic-settings
+
+# Logging
+structlog
+
+# HTTP client
+httpx
+
+# Development and testing
+pytest>=7.0.0
+pytest-asyncio
+pytest-cov
+
+# Async database support
+asyncpg

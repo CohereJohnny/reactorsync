@@ -7,6 +7,7 @@ python-multipart
 sqlalchemy>=2.0.0
 psycopg2-binary
 alembic
+pgvector
 
 # AI/ML
 cohere>=4.0.0

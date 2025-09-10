@@ -119,22 +119,25 @@ services:
   #     - reactorsync-network
   #   restart: unless-stopped
 
-  # Data Generator - Synthetic telemetry generation (Sprint 2)
-  # data-generator:
-  #   build:
-  #     context: ./data-generator
-  #     dockerfile: Dockerfile
-  #   environment:
-  #     - KAFKA_BOOTSTRAP_SERVERS=streaming:9092
-  #     - DATABASE_URL=postgresql://reactorsync:reactorsync@db:5432/reactorsync
-  #   depends_on:
-  #     - streaming
-  #     - db
-  #   volumes:
-  #     - ./data-generator:/app
-  #   networks:
-  #     - reactorsync-network
-  #   restart: unless-stopped
+  # Data Generator - Synthetic telemetry generation (Sprint 3)
+  data-generator:
+    build:
+      context: ./data-generator
+      dockerfile: Dockerfile
+    environment:
+      - KAFKA_BOOTSTRAP_SERVERS=streaming:9092
+      - DATABASE_URL=postgresql://reactorsync:reactorsync@db:5432/reactorsync
+      - GENERATION_INTERVAL=60
+      - ENVIRONMENT=development
+    depends_on:
+      - streaming
+      - db
+      - backend
+    volumes:
+      - ./data-generator/src:/app/src
+    networks:
+      - reactorsync-network
+    restart: unless-stopped
 
   # Redis - Caching and session storage
   redis:

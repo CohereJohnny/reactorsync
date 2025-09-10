@@ -19,20 +19,22 @@ warn() { echo -e "${YELLOW}⚠️  $1${NC}"; }
 echo -e "\n1. Data Generator Validation..."
 
 # Test data generator imports
-if cd data-generator/src && python -c "
+cd data-generator/src
+if python -c "
 from nuclear_physics import NuclearPhysicsEngine, TelemetryGenerator, AnomalyGenerator
 from kafka_producer import TelemetryProducer
 from database_client import DatabaseClient
 print('All data generator imports successful')
 " 2>/dev/null; then
     pass "Data generator components import successfully"
-    cd ../..
 else
     fail "Data generator import errors detected"
 fi
+cd ../..
 
 # Test physics engine
-if cd data-generator/src && python -c "
+cd data-generator/src
+if python -c "
 from nuclear_physics import NuclearPhysicsEngine
 engine = NuclearPhysicsEngine()
 from datetime import datetime
@@ -40,29 +42,27 @@ reading = engine.generate_telemetry_reading(1, 'CANDU', datetime.now(), 0)
 print('Physics engine generates realistic data:', list(reading.keys()))
 " 2>/dev/null; then
     pass "Nuclear physics engine generates realistic data"
-    cd ../..
 else
     fail "Physics engine errors detected"
 fi
+cd ../..
 
 # Test anomaly generation
-if cd data-generator/src && python -c "
+cd data-generator/src
+if python -c "
 from nuclear_physics import AnomalyGenerator
 anomaly = AnomalyGenerator.generate_anomaly('temperature_spike', 'yellow')
 print('Anomaly generation works:', anomaly)
 " 2>/dev/null; then
     pass "Anomaly generation system working"
-    cd ../..
 else
     fail "Anomaly generation errors detected"
 fi
-
-cd ../..
-
 echo -e "\n2. Backend WebSocket Integration..."
 
 # Test backend with WebSocket support
-if cd backend && source .venv/bin/activate && python -c "
+cd backend
+if source .venv/bin/activate && python -c "
 import sys
 sys.path.append('.')
 from main import app, websocket_manager
@@ -70,10 +70,10 @@ print('Backend with WebSocket support loads successfully')
 print('WebSocket manager initialized')
 " 2>/dev/null; then
     pass "Backend integrates WebSocket support successfully"
-    cd ..
 else
     fail "Backend WebSocket integration has errors"
 fi
+cd ..
 
 echo -e "\n3. Docker Services Validation..."
 
@@ -144,7 +144,8 @@ fi
 echo -e "\n5. Data Generation Validation..."
 
 # Test synthetic data generation
-if cd data-generator/src && python -c "
+cd data-generator/src
+if python -c "
 from nuclear_physics import TelemetryGenerator
 from datetime import datetime
 
@@ -165,10 +166,10 @@ anomaly_reading = generator.generate_reading(1, 'CANDU', datetime.now())
 print('Anomaly injection affects generation')
 " 2>/dev/null; then
     pass "Synthetic data generation produces realistic telemetry"
-    cd ../..
 else
     warn "Synthetic data generation issues detected"
 fi
+cd ../..
 
 echo -e "\n🎯 SPRINT 3 VALIDATION RESULTS:"
 echo "✅ Physics-informed synthetic data generation implemented"

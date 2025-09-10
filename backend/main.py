@@ -284,6 +284,175 @@ async def get_reactor_faults(reactor_id: int, db: Session = Depends(get_db)):
         raise HTTPException(status_code=500, detail=f"Failed to retrieve faults: {str(e)}")
 
 
+@app.get("/reactors/{reactor_id}/health")
+async def get_reactor_health(
+    reactor_id: int,
+    hours_back: int = 24,
+    db: Session = Depends(get_db)
+):
+    """Get reactor health history and trends"""
+    try:
+        from datetime import datetime, timedelta
+        
+        reactor_repo = ReactorRepository(db)
+        telemetry_repo = TelemetryRepository(db)
+        
+        # Get reactor info
+        reactor = reactor_repo.get_by_id(reactor_id)
+        if not reactor:
+            raise HTTPException(status_code=404, detail="Reactor not found")
+        
+        # Get recent telemetry for health calculation
+        end_time = datetime.utcnow()
+        start_time = end_time - timedelta(hours=hours_back)
+        
+        recent_telemetry = telemetry_repo.get_by_reactor(
+            reactor_id=reactor_id,
+            start_time=start_time,
+            end_time=end_time,
+            limit=hours_back * 60  # Assuming 1-minute intervals
+        )
+        
+        # Calculate health trends
+        health_history = []
+        for reading in recent_telemetry:
+            health_score = telemetry_repo.calculate_reactor_health(reactor_id, 1)
+            health_history.append({
+                "timestamp": reading.timestamp.isoformat(),
+                "health_score": health_score,
+                "telemetry": reading.to_dict()
+            })
+        
+        return {
+            "reactor_id": reactor_id,
+            "current_health_score": reactor.health_score,
+            "current_status": reactor.status.value,
+            "health_history": health_history[:100],  # Limit to 100 most recent
+            "analysis_period_hours": hours_back,
+            "data_points": len(health_history)
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error("Error retrieving reactor health", reactor_id=reactor_id, error=str(e))
+        raise HTTPException(status_code=500, detail=f"Failed to retrieve health data: {str(e)}")
+
+
+@app.get("/system/statistics")
+async def get_system_statistics(db: Session = Depends(get_db)):
+    """Get comprehensive system statistics and fleet overview"""
+    try:
+        system_stats = DatabaseService.get_system_statistics()
+        
+        # Add real-time streaming statistics if available
+        streaming_stats = {
+            "active_websocket_connections": len(websocket_manager.active_connections),
+            "reactor_subscriptions": len(websocket_manager.reactor_subscriptions),
+            "data_generation_active": True  # This would be connected to data generator
+        }
+        
+        return {
+            **system_stats,
+            "streaming": streaming_stats,
+            "timestamp": datetime.utcnow().isoformat()
+        }
+        
+    except Exception as e:
+        logger.error("Error retrieving system statistics", error=str(e))
+        raise HTTPException(status_code=500, detail=f"Failed to retrieve statistics: {str(e)}")
+
+
+@app.post("/reactors")
+async def create_reactor(
+    reactor_data: dict,
+    db: Session = Depends(get_db)
+):
+    """Create a new reactor"""
+    try:
+        reactor_repo = ReactorRepository(db)
+        
+        # Validate required fields
+        required_fields = ["name", "type", "location"]
+        for field in required_fields:
+            if field not in reactor_data:
+                raise HTTPException(status_code=400, detail=f"Missing required field: {field}")
+        
+        # Create reactor
+        reactor = reactor_repo.create(reactor_data)
+        
+        # Broadcast new reactor to WebSocket clients
+        await websocket_manager.broadcast_to_all({
+            "type": "reactor_created",
+            "reactor": reactor.to_dict(),
+            "timestamp": datetime.utcnow().isoformat()
+        })
+        
+        return reactor.to_dict()
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error("Error creating reactor", error=str(e))
+        raise HTTPException(status_code=500, detail=f"Failed to create reactor: {str(e)}")
+
+
+@app.put("/reactors/{reactor_id}")
+async def update_reactor(
+    reactor_id: int,
+    update_data: dict,
+    db: Session = Depends(get_db)
+):
+    """Update reactor information"""
+    try:
+        reactor_repo = ReactorRepository(db)
+        reactor = reactor_repo.update(reactor_id, update_data)
+        
+        if not reactor:
+            raise HTTPException(status_code=404, detail="Reactor not found")
+        
+        # Broadcast reactor update to WebSocket clients
+        await websocket_manager.broadcast_to_reactor_subscribers(reactor_id, {
+            "type": "reactor_updated",
+            "reactor": reactor.to_dict(),
+            "timestamp": datetime.utcnow().isoformat()
+        })
+        
+        return reactor.to_dict()
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error("Error updating reactor", reactor_id=reactor_id, error=str(e))
+        raise HTTPException(status_code=500, detail=f"Failed to update reactor: {str(e)}")
+
+
+@app.delete("/reactors/{reactor_id}")
+async def delete_reactor(reactor_id: int, db: Session = Depends(get_db)):
+    """Delete a reactor"""
+    try:
+        reactor_repo = ReactorRepository(db)
+        success = reactor_repo.delete(reactor_id)
+        
+        if not success:
+            raise HTTPException(status_code=404, detail="Reactor not found")
+        
+        # Broadcast reactor deletion to WebSocket clients
+        await websocket_manager.broadcast_to_all({
+            "type": "reactor_deleted",
+            "reactor_id": reactor_id,
+            "timestamp": datetime.utcnow().isoformat()
+        })
+        
+        return {"status": "success", "message": f"Reactor {reactor_id} deleted"}
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error("Error deleting reactor", reactor_id=reactor_id, error=str(e))
+        raise HTTPException(status_code=500, detail=f"Failed to delete reactor: {str(e)}")
+
+
 @app.post("/admin/initialize-data")
 async def initialize_sample_data():
     """Initialize sample data for development and demo (admin endpoint)"""

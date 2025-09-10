@@ -3,10 +3,14 @@ ReactorSync Backend - FastAPI Application
 Main entry point for the nuclear reactor management API
 """
 
-from fastapi import FastAPI, HTTPException, Depends
+from fastapi import FastAPI, HTTPException, Depends, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
+import asyncio
+import json
+from typing import List, Dict
+from datetime import datetime
 from models.base import get_db
 from services.database_service import DatabaseService
 from repositories import ReactorRepository, TelemetryRepository, FaultRepository
@@ -33,6 +37,79 @@ structlog.configure(
 )
 
 logger = structlog.get_logger()
+
+# WebSocket connection manager
+class ConnectionManager:
+    """Manages WebSocket connections for real-time updates"""
+    
+    def __init__(self):
+        self.active_connections: List[WebSocket] = []
+        self.reactor_subscriptions: Dict[int, List[WebSocket]] = {}
+    
+    async def connect(self, websocket: WebSocket):
+        """Accept a WebSocket connection"""
+        await websocket.accept()
+        self.active_connections.append(websocket)
+        logger.info("WebSocket client connected", total_connections=len(self.active_connections))
+    
+    def disconnect(self, websocket: WebSocket):
+        """Remove a WebSocket connection"""
+        if websocket in self.active_connections:
+            self.active_connections.remove(websocket)
+        
+        # Remove from reactor subscriptions
+        for reactor_id, connections in self.reactor_subscriptions.items():
+            if websocket in connections:
+                connections.remove(websocket)
+        
+        logger.info("WebSocket client disconnected", total_connections=len(self.active_connections))
+    
+    def subscribe_to_reactor(self, websocket: WebSocket, reactor_id: int):
+        """Subscribe a WebSocket to reactor updates"""
+        if reactor_id not in self.reactor_subscriptions:
+            self.reactor_subscriptions[reactor_id] = []
+        
+        if websocket not in self.reactor_subscriptions[reactor_id]:
+            self.reactor_subscriptions[reactor_id].append(websocket)
+        
+        logger.debug("Client subscribed to reactor", reactor_id=reactor_id)
+    
+    async def broadcast_to_all(self, message: dict):
+        """Broadcast message to all connected clients"""
+        if not self.active_connections:
+            return
+        
+        disconnected = []
+        for connection in self.active_connections:
+            try:
+                await connection.send_text(json.dumps(message, default=str))
+            except Exception:
+                disconnected.append(connection)
+        
+        # Clean up disconnected clients
+        for connection in disconnected:
+            self.disconnect(connection)
+    
+    async def broadcast_to_reactor_subscribers(self, reactor_id: int, message: dict):
+        """Broadcast message to clients subscribed to a specific reactor"""
+        if reactor_id not in self.reactor_subscriptions:
+            return
+        
+        connections = self.reactor_subscriptions[reactor_id].copy()
+        disconnected = []
+        
+        for connection in connections:
+            try:
+                await connection.send_text(json.dumps(message, default=str))
+            except Exception:
+                disconnected.append(connection)
+        
+        # Clean up disconnected clients
+        for connection in disconnected:
+            self.disconnect(connection)
+
+# Global connection manager
+websocket_manager = ConnectionManager()
 
 
 @asynccontextmanager
@@ -216,6 +293,104 @@ async def initialize_sample_data():
         raise HTTPException(status_code=500, detail=result["message"])
     
     return result
+
+
+# WebSocket endpoints
+@app.websocket("/ws/telemetry")
+async def websocket_telemetry(websocket: WebSocket):
+    """WebSocket endpoint for real-time telemetry updates"""
+    await websocket_manager.connect(websocket)
+    
+    try:
+        while True:
+            # Wait for client messages (subscription requests)
+            data = await websocket.receive_text()
+            message = json.loads(data)
+            
+            if message.get("action") == "subscribe_reactor":
+                reactor_id = message.get("reactor_id")
+                if reactor_id:
+                    websocket_manager.subscribe_to_reactor(websocket, reactor_id)
+                    await websocket.send_text(json.dumps({
+                        "type": "subscription_confirmed",
+                        "reactor_id": reactor_id
+                    }))
+            
+    except WebSocketDisconnect:
+        websocket_manager.disconnect(websocket)
+    except Exception as e:
+        logger.error("WebSocket error", error=str(e))
+        websocket_manager.disconnect(websocket)
+
+
+@app.websocket("/ws/alerts")
+async def websocket_alerts(websocket: WebSocket):
+    """WebSocket endpoint for real-time alert/fault updates"""
+    await websocket_manager.connect(websocket)
+    
+    try:
+        while True:
+            # Keep connection alive and handle client messages
+            data = await websocket.receive_text()
+            message = json.loads(data)
+            
+            if message.get("action") == "ping":
+                await websocket.send_text(json.dumps({"type": "pong"}))
+            
+    except WebSocketDisconnect:
+        websocket_manager.disconnect(websocket)
+    except Exception as e:
+        logger.error("WebSocket alerts error", error=str(e))
+        websocket_manager.disconnect(websocket)
+
+
+# Admin endpoints for anomaly injection
+@app.post("/admin/inject-anomaly")
+async def inject_anomaly(
+    reactor_id: int,
+    anomaly_type: str,
+    severity: str = "yellow",
+    duration_minutes: int = 30
+):
+    """Inject an anomaly for demo purposes"""
+    # This will be connected to the data generator service
+    # For now, return success
+    
+    # Broadcast anomaly injection to WebSocket clients
+    await websocket_manager.broadcast_to_reactor_subscribers(reactor_id, {
+        "type": "anomaly_injected",
+        "reactor_id": reactor_id,
+        "anomaly_type": anomaly_type,
+        "severity": severity,
+        "duration_minutes": duration_minutes,
+        "timestamp": datetime.utcnow().isoformat()
+    })
+    
+    return {
+        "status": "success",
+        "message": f"Anomaly '{anomaly_type}' injected into reactor {reactor_id}",
+        "reactor_id": reactor_id,
+        "anomaly_type": anomaly_type,
+        "severity": severity,
+        "duration_minutes": duration_minutes
+    }
+
+
+@app.post("/admin/clear-anomaly")
+async def clear_anomaly(reactor_id: int):
+    """Clear any active anomaly for a reactor"""
+    # Broadcast anomaly clearing to WebSocket clients
+    await websocket_manager.broadcast_to_reactor_subscribers(reactor_id, {
+        "type": "anomaly_cleared",
+        "reactor_id": reactor_id,
+        "timestamp": datetime.utcnow().isoformat()
+    })
+    
+    return {
+        "status": "success",
+        "message": f"Anomaly cleared for reactor {reactor_id}",
+        "reactor_id": reactor_id
+    }
 
 
 if __name__ == "__main__":

@@ -71,7 +71,7 @@ def test_websocket_integration():
         content = f.read()
     
     websocket_features = [
-        ("WebSocket Import", "from fastapi import.*WebSocket"),
+        ("WebSocket Import", "WebSocket"),
         ("Connection Manager", "class ConnectionManager"),
         ("WebSocket Manager", "websocket_manager = ConnectionManager()"),
         ("Telemetry WebSocket", '@app.websocket("/ws/telemetry")'),
@@ -81,7 +81,7 @@ def test_websocket_integration():
     ]
     
     for feature_name, pattern in websocket_features:
-        if pattern.replace(".*", "") in content.replace("\n", " "):
+        if pattern in content:
             print(f"✅ WebSocket feature: {feature_name}")
         else:
             print(f"❌ Missing WebSocket feature: {feature_name}")

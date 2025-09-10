@@ -5,6 +5,7 @@ Database Service - High-level database operations and connection management
 from typing import Dict, Any, List
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy import text
 from contextlib import contextmanager
 from models.base import SessionLocal, engine
 from models.reactor import Reactor
@@ -46,10 +47,10 @@ class DatabaseService:
         try:
             with DatabaseService.get_session() as db:
                 # Test basic connectivity
-                db.execute("SELECT 1")
+                db.execute(text("SELECT 1"))
                 
                 # Check pgvector extension
-                result = db.execute("SELECT 1 FROM pg_extension WHERE extname='vector'").fetchone()
+                result = db.execute(text("SELECT 1 FROM pg_extension WHERE extname='vector'")).fetchone()
                 pgvector_available = result is not None
                 
                 # Get basic statistics
@@ -61,11 +62,10 @@ class DatabaseService:
                     "pgvector_available": pgvector_available,
                     "reactor_count": reactor_count,
                     "connection_pool": {
-                        "size": engine.pool.size(),
-                        "checked_in": engine.pool.checkedin(),
-                        "checked_out": engine.pool.checkedout(),
-                        "overflow": engine.pool.overflow(),
-                        "invalid": engine.pool.invalid()
+                        "size": getattr(engine.pool, 'size', lambda: 0)(),
+                        "checked_in": getattr(engine.pool, 'checkedin', lambda: 0)(),
+                        "checked_out": getattr(engine.pool, 'checkedout', lambda: 0)(),
+                        "overflow": getattr(engine.pool, 'overflow', lambda: 0)(),
                     }
                 }
         except Exception as e:
@@ -152,7 +152,7 @@ class DatabaseService:
         try:
             with DatabaseService.get_session() as db:
                 # Delete all data in reverse order of dependencies
-                db.execute("TRUNCATE knowledge_base, faults, telemetry, reactors RESTART IDENTITY CASCADE")
+                db.execute(text("TRUNCATE knowledge_base, faults, telemetry, reactors RESTART IDENTITY CASCADE"))
                 db.commit()
                 
                 logger.warning("Database reset completed")

@@ -20,7 +20,9 @@ echo -e "\n1. Database Models Validation..."
 
 # Test model imports
 cd backend
-if python -c "
+if source .venv/bin/activate && python -c "
+import sys
+sys.path.append('.')
 from models import Reactor, Telemetry, Fault, KnowledgeBase
 from models.reactor import ReactorStatus, ReactorType
 from models.fault import FaultSeverity
@@ -32,7 +34,9 @@ else
 fi
 
 # Test repository imports
-if python -c "
+if source .venv/bin/activate && python -c "
+import sys
+sys.path.append('.')
 from repositories import ReactorRepository, TelemetryRepository, FaultRepository, KnowledgeBaseRepository
 print('All repository imports successful')
 " 2>/dev/null; then
@@ -44,7 +48,9 @@ fi
 echo -e "\n2. Database Service Validation..."
 
 # Test database service
-if python -c "
+if source .venv/bin/activate && python -c "
+import sys
+sys.path.append('.')
 from services.database_service import DatabaseService
 print('Database service import successful')
 " 2>/dev/null; then
@@ -73,7 +79,9 @@ fi
 echo -e "\n4. FastAPI Integration Validation..."
 
 # Test FastAPI with database integration
-if python -c "
+if source .venv/bin/activate && python -c "
+import sys
+sys.path.append('.')
 from main import app
 from fastapi.testclient import TestClient
 print('FastAPI with database integration loads successfully')
@@ -95,10 +103,12 @@ fi
 # Run model tests if pytest is available
 if command -v pytest >/dev/null 2>&1; then
     echo "   Running model tests..."
-    if pytest tests/test_models.py -v --tb=short; then
+    if cd tests && python -m pytest test_models.py -v --tb=short 2>/dev/null; then
         pass "Model tests pass"
+        cd ..
     else
         warn "Some model tests failed (may need database connection)"
+        cd .. 2>/dev/null || true
     fi
 else
     warn "pytest not available for running tests"
@@ -110,7 +120,7 @@ cd ..
 
 # Test Docker build with new dependencies
 echo "   Testing backend Docker build with new dependencies..."
-if docker build -q --target development -t reactorsync-backend-sprint2 ./backend > /dev/null 2>&1; then
+if docker build --target development -t reactorsync-backend-sprint2 ./backend > /dev/null 2>&1; then
     pass "Backend builds successfully with database dependencies"
 else
     fail "Backend Docker build failed with new dependencies"
